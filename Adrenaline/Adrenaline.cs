@@ -1183,8 +1183,8 @@ namespace cAlgo.Robots
             bool filter2short = Bid < EMA200.Result.LastValue;
             bool filter3short = RSI.Result.LastValue > RsiOver;
 
-            double RealMultiplier = Convert.ToInt32(Account.Balance / BalanceMultiplier);
-            double RealLots = (BalanceMultiplier > 0 && RealMultiplier > 1) ? Lots * RealMultiplier : Lots;
+            double RealMultiplier = (BalanceMultiplier > 0 ) ? (int)(Account.Balance / BalanceMultiplier) : 1;
+            double RealLots = (RealMultiplier > 1) ? Lots * RealMultiplier : Lots;
 
             if (_SARTriggerLong() && filter1long && filter2long && filter3long)
             {
