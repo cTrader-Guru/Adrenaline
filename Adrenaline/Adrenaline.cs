@@ -1050,7 +1050,7 @@ namespace cAlgo.Robots
         [Parameter("Preset Information", Group = "Identity", DefaultValue = "(v.1.0.6) EURUSD 30m - Balance €1000 - BackTested 06.05.2020 To 06.05.2021 - R:R 1:3")]
         public string PresetInfo { get; set; }
 
-        [Parameter("Max Cross Coworking (zero = disabled)", Group = "Strategy", DefaultValue = 1, MinValue = 0)]
+        [Parameter("Max Cross Coworking (zero = unlimited)", Group = "Strategy", DefaultValue = 1, MinValue = 0)]
         public int MaxCross { get; set; }
 
         [Parameter("Lots", Group = "Strategy", DefaultValue = 0.1, MinValue = 0.01, Step = 0.01)]
