@@ -1014,7 +1014,7 @@ namespace cAlgo.Robots
 
         public const string NAME = "Adrenaline";
 
-        public const string VERSION = "1.0.6";
+        public const string VERSION = "1.0.7";
 
         #endregion
 
@@ -1055,6 +1055,9 @@ namespace cAlgo.Robots
 
         [Parameter("Lots", Group = "Strategy", DefaultValue = 0.1, MinValue = 0.01, Step = 0.01)]
         public double Lots { get; set; }
+
+        [Parameter("Balance Multiplier (zero = disabled; es. 0.01 each € 1000 )", Group = "Strategy", DefaultValue = 1000, MinValue = 0, Step = 0.5)]
+        public double BalanceMultiplier { get; set; }
 
         [Parameter("Stop Loss", Group = "Strategy", DefaultValue = 30)]
         public int StopLoss { get; set; }
@@ -1127,7 +1130,7 @@ namespace cAlgo.Robots
 
             #endregion
 
-            Pause1 = new Extensions.Monitor.PauseTimes
+            Pause1 = new Extensions.Monitor.PauseTimes 
             {
 
                 Over = PauseOver,
@@ -1180,16 +1183,19 @@ namespace cAlgo.Robots
             bool filter2short = Bid < EMA200.Result.LastValue;
             bool filter3short = RSI.Result.LastValue > RsiOver;
 
+            double RealMultiplier = Convert.ToInt32(Account.Balance / BalanceMultiplier);
+            double RealLots = (BalanceMultiplier > 0 && RealMultiplier > 1) ? Lots * RealMultiplier : Lots;
+
             if (_SARTriggerLong() && filter1long && filter2long && filter3long)
             {
 
-                ExecuteOrder(Symbol.QuantityToVolumeInUnits(Lots), TradeType.Buy);
+                ExecuteOrder(Symbol.QuantityToVolumeInUnits(RealLots), TradeType.Buy);
 
             }
             else if (_SARTriggerShort() && filter1short && filter2short && filter3short)
             {
 
-                ExecuteOrder(Symbol.QuantityToVolumeInUnits(Lots), TradeType.Sell);
+                ExecuteOrder(Symbol.QuantityToVolumeInUnits(RealLots), TradeType.Sell);
 
             }
 
@@ -1210,7 +1216,7 @@ namespace cAlgo.Robots
 
         private void _onPositionsClosed(PositionClosedEventArgs args)
         {
-            
+
             var position = args.Position;
 
             if (position.Label != MyLabel || position.SymbolName != SymbolName)
@@ -1218,7 +1224,7 @@ namespace cAlgo.Robots
 
             if (position.NetProfit < 0)
             {
-                
+
                 ConsecutiveLoss++;
 
                 if (MaxLoss == 0 || ConsecutiveLoss < MaxLoss)
@@ -1230,7 +1236,7 @@ namespace cAlgo.Robots
                     ExecuteOrder(Symbol.QuantityToVolumeInUnits(Math.Round(position.Quantity * Multiplier, 2)), reversed);
 
                 }
-                
+
             }
             else
             {
