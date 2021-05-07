@@ -206,6 +206,16 @@ namespace cAlgo
             Auto
 
         }
+
+        public enum StrategyType
+        {
+
+            Moderate,
+            Aggressive,
+            Auto
+
+        }
+
         #endregion
 
         #region Class
@@ -1014,7 +1024,7 @@ namespace cAlgo.Robots
 
         public const string NAME = "Adrenaline";
 
-        public const string VERSION = "1.0.7";
+        public const string VERSION = "1.0.8";
 
         #endregion
 
@@ -1053,10 +1063,13 @@ namespace cAlgo.Robots
         [Parameter("Max Cross Coworking (zero = unlimited)", Group = "Strategy", DefaultValue = 1, MinValue = 0)]
         public int MaxCross { get; set; }
 
+        [Parameter("Mode", Group = "Strategy", DefaultValue = Extensions.StrategyType.Moderate)]
+        public Extensions.StrategyType StrategyType { get; set; }
+
         [Parameter("Lots", Group = "Strategy", DefaultValue = 0.1, MinValue = 0.01, Step = 0.01)]
         public double Lots { get; set; }
 
-        [Parameter("Balance Multiplier (zero = disabled; es. 0.01 each € 1000 )", Group = "Strategy", DefaultValue = 1000, MinValue = 0, Step = 0.5)]
+        [Parameter("Balance Multiplier (zero = disabled; es. 0.01 each € 1000 )", Group = "Strategy", DefaultValue = 0, MinValue = 0, Step = 0.5)]
         public double BalanceMultiplier { get; set; }
 
         [Parameter("Stop Loss", Group = "Strategy", DefaultValue = 30)]
@@ -1067,6 +1080,9 @@ namespace cAlgo.Robots
 
         [Parameter("Multiplier", Group = "Adaptive Martingale", DefaultValue = 2, MinValue = 1)]
         public double Multiplier { get; set; }
+
+        [Parameter("Max Loss Before Multiplier (zero = always)", Group = "Adaptive Martingale", DefaultValue = 0, MinValue = 0)]
+        public int MaxLossBeforeMultiplier { get; set; }
 
         [Parameter("Max Consecutive Loss (zero = unlimited)", Group = "Adaptive Martingale", DefaultValue = 5, MinValue = 0)]
         public int MaxLoss { get; set; }
@@ -1130,7 +1146,9 @@ namespace cAlgo.Robots
 
             #endregion
 
-            Pause1 = new Extensions.Monitor.PauseTimes 
+            if (StrategyType == Extensions.StrategyType.Auto) StrategyType = (StopLoss > TakeProfit) ? Extensions.StrategyType.Aggressive : Extensions.StrategyType.Moderate;
+
+             Pause1 = new Extensions.Monitor.PauseTimes 
             {
 
                 Over = PauseOver,
@@ -1183,7 +1201,7 @@ namespace cAlgo.Robots
             bool filter2short = Bid < EMA200.Result.LastValue;
             bool filter3short = RSI.Result.LastValue > RsiOver;
 
-            double RealMultiplier = (BalanceMultiplier > 0 ) ? (int)(Account.Balance / BalanceMultiplier) : 1;
+            double RealMultiplier = (BalanceMultiplier > 0) ? (int)(Account.Balance / BalanceMultiplier) : 1;
             double RealLots = (RealMultiplier > 1) ? Lots * RealMultiplier : Lots;
 
             if (_SARTriggerLong() && filter1long && filter2long && filter3long)
@@ -1230,10 +1248,18 @@ namespace cAlgo.Robots
                 if (MaxLoss == 0 || ConsecutiveLoss < MaxLoss)
                 {
 
+                    //MaxLossBeforeMultiplier
+
+                    double RealMultiplier = (MaxLossBeforeMultiplier == 0 || ConsecutiveLoss >= MaxLossBeforeMultiplier) ? Multiplier : 1;
 
                     TradeType reversed = (position.TradeType == TradeType.Sell) ? TradeType.Buy : TradeType.Sell;
 
-                    ExecuteOrder(Symbol.QuantityToVolumeInUnits(Math.Round(position.Quantity * Multiplier, 2)), reversed);
+                    ExecuteOrder(Symbol.QuantityToVolumeInUnits(Math.Round(position.Quantity * RealMultiplier, 2)), reversed);
+
+                }else if (MaxLoss > 0 && ConsecutiveLoss >= MaxLoss && StrategyType == Extensions.StrategyType.Aggressive)
+                {
+
+                    ConsecutiveLoss = 0;
 
                 }
 
