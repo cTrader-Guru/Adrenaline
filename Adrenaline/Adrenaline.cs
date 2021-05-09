@@ -361,7 +361,7 @@ namespace cAlgo
                 double lowestLowAfterFirstOpen = (Positions.Length > 0) ? Info.LowestLowAfterFirstOpen : 0;
 
                 // --> Resetto le informazioni
-                Info = new Information 
+                Info = new Information
                 {
 
                     // --> Inizializzo con i vecchi dati
@@ -1018,13 +1018,14 @@ namespace cAlgo.Robots
     [Robot(TimeZone = TimeZones.UTC, AccessRights = AccessRights.FullAccess)]
     public class Adrenaline : Robot
     {
+
         #region Identity
 
         public const int ID = 189113;
 
         public const string NAME = "Adrenaline";
 
-        public const string VERSION = "1.0.8";
+        public const string VERSION = "1.0.9";
 
         #endregion
 
@@ -1066,17 +1067,29 @@ namespace cAlgo.Robots
         [Parameter("Mode", Group = "Strategy", DefaultValue = Extensions.StrategyType.Moderate)]
         public Extensions.StrategyType StrategyType { get; set; }
 
+        [Parameter("Stop Loss", Group = "Strategy", DefaultValue = 30)]
+        public int StopLoss { get; set; }
+
+        [Parameter("Take Profit", Group = "Strategy", DefaultValue = 30)]
+        public int TakeProfit { get; set; }
+
         [Parameter("Lots", Group = "Strategy", DefaultValue = 0.1, MinValue = 0.01, Step = 0.01)]
         public double Lots { get; set; }
 
         [Parameter("Balance Multiplier (zero = disabled; es. 0.01 each € 1000 )", Group = "Strategy", DefaultValue = 0, MinValue = 0, Step = 0.5)]
         public double BalanceMultiplier { get; set; }
 
-        [Parameter("Stop Loss", Group = "Strategy", DefaultValue = 30)]
-        public int StopLoss { get; set; }
+        [Parameter("Max Spread allowed", Group = "Filters", DefaultValue = 1.5, MinValue = 0.1, Step = 0.1)]
+        public double SpreadToTrigger { get; set; }
 
-        [Parameter("Take Profit", Group = "Strategy", DefaultValue = 30)]
-        public int TakeProfit { get; set; }
+        [Parameter("Max GAP Allowed (pips)", Group = "Filters", DefaultValue = 1, MinValue = 0, Step = 0.01)]
+        public double GAP { get; set; }
+
+        [Parameter("Pause over this time", Group = "Time Zone", DefaultValue = 0, MinValue = 0, MaxValue = 23.59)]
+        public double PauseOver { get; set; }
+
+        [Parameter("Pause under this time", Group = "Time Zone", DefaultValue = 0, MinValue = 0, MaxValue = 23.59)]
+        public double PauseUnder { get; set; }
 
         [Parameter("Multiplier", Group = "Adaptive Martingale", DefaultValue = 2, MinValue = 1)]
         public double Multiplier { get; set; }
@@ -1086,12 +1099,6 @@ namespace cAlgo.Robots
 
         [Parameter("Max Consecutive Loss (zero = unlimited)", Group = "Adaptive Martingale", DefaultValue = 5, MinValue = 0)]
         public int MaxLoss { get; set; }
-
-        [Parameter("Pause over this time", Group = "Time Zone", DefaultValue = 0, MinValue = 0, MaxValue = 23.59)]
-        public double PauseOver { get; set; }
-
-        [Parameter("Pause under this time", Group = "Time Zone", DefaultValue = 0, MinValue = 0, MaxValue = 23.59)]
-        public double PauseUnder { get; set; }
 
         [Parameter("Period", Group = "RSI", DefaultValue = 14, MinValue = 1)]
         public int RsiPeriod { get; set; }
@@ -1125,7 +1132,7 @@ namespace cAlgo.Robots
 
             #region LICENZA : INIT CHECK
 
-            CL_CTG_Licenza.LicenzaConfig licConfig = new CL_CTG_Licenza.LicenzaConfig 
+            CL_CTG_Licenza.LicenzaConfig licConfig = new CL_CTG_Licenza.LicenzaConfig
             {
                 AccountBroker = Account.BrokerName,
                 AcconuntNumber = Account.Number.ToString()
@@ -1146,9 +1153,10 @@ namespace cAlgo.Robots
 
             #endregion
 
-            if (StrategyType == Extensions.StrategyType.Auto) StrategyType = (StopLoss > TakeProfit) ? Extensions.StrategyType.Aggressive : Extensions.StrategyType.Moderate;
+            if (StrategyType == Extensions.StrategyType.Auto)
+                StrategyType = (StopLoss > TakeProfit) ? Extensions.StrategyType.Aggressive : Extensions.StrategyType.Moderate;
 
-             Pause1 = new Extensions.Monitor.PauseTimes 
+            Pause1 = new Extensions.Monitor.PauseTimes
             {
 
                 Over = PauseOver,
@@ -1193,6 +1201,8 @@ namespace cAlgo.Robots
             if (Monitor1.OpenedInThisBar || Monitor1.Positions.Length > 0 || Monitor1.InPause(Server.Time) || !_canCowork(Monitor1))
                 return;
 
+            bool sharedFilter = (Monitor1.Symbol.RealSpread() <= SpreadToTrigger && !Monitor1.InGAP(GAP));
+
             bool filter1long = EMA200.Result.LastValue > EMA500.Result.LastValue;
             bool filter2long = Ask > EMA200.Result.LastValue;
             bool filter3long = RSI.Result.LastValue < RsiUnder;
@@ -1204,13 +1214,13 @@ namespace cAlgo.Robots
             double RealMultiplier = (BalanceMultiplier > 0) ? (int)(Account.Balance / BalanceMultiplier) : 1;
             double RealLots = (RealMultiplier > 1) ? Lots * RealMultiplier : Lots;
 
-            if (_SARTriggerLong() && filter1long && filter2long && filter3long)
+            if (_SARTriggerLong() && sharedFilter && filter1long && filter2long && filter3long)
             {
 
                 ExecuteOrder(Symbol.QuantityToVolumeInUnits(RealLots), TradeType.Buy);
 
             }
-            else if (_SARTriggerShort() && filter1short && filter2short && filter3short)
+            else if (_SARTriggerShort() && sharedFilter && filter1short && filter2short && filter3short)
             {
 
                 ExecuteOrder(Symbol.QuantityToVolumeInUnits(RealLots), TradeType.Sell);
@@ -1223,12 +1233,21 @@ namespace cAlgo.Robots
 
         #region Private Methods
 
-        private void ExecuteOrder(double volume, TradeType tradeType)
+        private void ExecuteOrder(double volume, TradeType tradeType, double? tmpSL = 0, double? tmpTP = 0)
         {
-            var result = ExecuteMarketOrder(tradeType, SymbolName, volume, MyLabel, StopLoss, TakeProfit);
+
+            if (tmpSL == 0) tmpSL = StopLoss;
+            if (tmpTP == 0) tmpTP = TakeProfit;
+
+            var result = ExecuteMarketOrder(tradeType, SymbolName, volume, MyLabel, tmpSL, tmpTP);
 
             if (result.Error == ErrorCode.NoMoney)
+            {
+
+                Print("No Money, close cBot");
                 Stop();
+
+            }
 
         }
 
@@ -1256,7 +1275,8 @@ namespace cAlgo.Robots
 
                     ExecuteOrder(Symbol.QuantityToVolumeInUnits(Math.Round(position.Quantity * RealMultiplier, 2)), reversed);
 
-                }else if (MaxLoss > 0 && ConsecutiveLoss >= MaxLoss && StrategyType == Extensions.StrategyType.Aggressive)
+                }
+                else if (MaxLoss > 0 && ConsecutiveLoss >= MaxLoss && StrategyType == Extensions.StrategyType.Aggressive)
                 {
 
                     ConsecutiveLoss = 0;
@@ -1337,10 +1357,10 @@ namespace cAlgo.Robots
                 return;
 
             // --> Organizzo i dati per la richiesta degli aggiornamenti
-            Guru.API.RequestProductInfo Request = new Guru.API.RequestProductInfo 
+            Guru.API.RequestProductInfo Request = new Guru.API.RequestProductInfo
             {
 
-                MyProduct = new Guru.Product 
+                MyProduct = new Guru.Product
                 {
 
                     ID = ID,
@@ -1468,7 +1488,8 @@ namespace cAlgo.Robots
 
                                     }
 
-                                } catch
+                                }
+                                catch
                                 {
 
                                     if (MessageBox.Show("Expired, remove cookie session?", "Error", MessageBoxButtons.YesNo, MessageBoxIcon.Error) == DialogResult.Yes)
@@ -1494,7 +1515,8 @@ namespace cAlgo.Robots
 
                 }
 
-            } catch (Exception exp)
+            }
+            catch (Exception exp)
             {
 
                 MessageBox.Show("Encryption issue, contact support@ctrader.guru", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -1523,7 +1545,7 @@ namespace cAlgo.Robots
 
             }
 
-            StackPanel stackPanel = new StackPanel 
+            StackPanel stackPanel = new StackPanel
             {
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = API.HorizontalAlignment.Center,
@@ -1534,7 +1556,7 @@ namespace cAlgo.Robots
                 Margin = new Thickness(10, 10, 10, 10)
             };
 
-            Button btnLogin = new Button 
+            Button btnLogin = new Button
             {
                 Text = "CTRADER GURU - LOGIN",
                 BackgroundColor = Color.Red,
@@ -1565,7 +1587,8 @@ namespace cAlgo.Robots
                     DrawingDialog.IsVisible = false;
                     System.Windows.Forms.Application.DoEvents();
 
-                } catch
+                }
+                catch
                 {
                 }
 
@@ -1821,7 +1844,8 @@ namespace Guru
 
                 }
 
-            } catch
+            }
+            catch
             {
 
             }
@@ -1831,7 +1855,7 @@ namespace Guru
             {
 
                 // --> Strutturo le informazioni per la richiesta POST
-                NameValueCollection data = new NameValueCollection 
+                NameValueCollection data = new NameValueCollection
                 {
                     {
                         "account_broker",
@@ -1885,11 +1909,13 @@ namespace Guru
 
                     File.WriteAllText(fileToCheck, JsonConvert.SerializeObject(ProductInfo.LastProduct));
 
-                } catch
+                }
+                catch
                 {
                 }
 
-            } catch (Exception Exp)
+            }
+            catch (Exception Exp)
             {
 
                 // --> Qualcosa è andato storto, registro l'eccezione
