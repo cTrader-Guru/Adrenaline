@@ -1025,7 +1025,7 @@ namespace cAlgo.Robots
 
         public const string NAME = "Adrenaline";
 
-        public const string VERSION = "1.0.9";
+        public const string VERSION = "1.1.0";
 
         #endregion
 
@@ -1185,16 +1185,56 @@ namespace cAlgo.Robots
         protected override void OnTick()
         {
 
-            // --> Controllo Licenza obbligatorio
-            if (exitoncalculate)
+
+            #region LICENZA : LOOP CHECK                       
+
+            if (RunningMode == RunningMode.RealTime)
             {
 
-                if (DrawingDialog != null && !DrawingDialog.IsVisible)
-                    Stop();
+                if (exitoncalculate)
+                {
 
-                return;
+                    if (DrawingDialog != null && !DrawingDialog.IsVisible)
+                    {
+
+                        Stop();
+
+                    }
+                    else
+                    {
+
+                        _createButtonLogin();
+
+                    }
+
+                    return;
+
+                }
+                else if (licenzaExpire != null && licenzaInfo.Expire.CompareTo("*") != 0 && Monitor1.Positions.Length == 0)
+                {
+
+                    if (DateTime.Compare(licenzaExpire, Server.Time) > 0)
+                    {
+
+                        // --> TODO
+
+                    }
+                    else
+                    {
+
+                        exitoncalculate = true;
+
+                        Print("Expired (" + licenzaExpire + ")" + " (server : " + Server.Time.ToString() + ")");
+
+                        return;
+
+                    }
+
+                }
 
             }
+
+            #endregion
 
             Monitor1.Update(false, null, null, 0, null);
 
