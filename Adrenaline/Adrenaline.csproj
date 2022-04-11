@@ -76,4 +76,10 @@
   <Target Name="AfterBuild">
   </Target>
   -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Indicators\Force Index\Force Index\Force Index.csproj">
+      <Project>{8B59A1E6-33F7-4454-A63D-9F4DC93507D8}</Project>
+      <Name>Force Index</Name>
+    </ProjectReference>
+  </ItemGroup>
 </Project>
