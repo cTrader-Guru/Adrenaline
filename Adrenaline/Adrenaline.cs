@@ -1,44 +1,18 @@
 ﻿using System;
-using System.ComponentModel;
 using cAlgo.API;
 using cAlgo.API.Internals;
 using cAlgo.API.Indicators;
-using cAlgo.Indicators;
 using Newtonsoft.Json;
-
-#region UPDATE : USING
-
-using System.Collections.Specialized;
-using System.Text.RegularExpressions;
-using System.Net;
-using System.Text;
-
-#endregion
-
-#region LICENZA : USING
-
-using NM_CTG_Licenza;
-using Button = cAlgo.API.Button;
-using System.Diagnostics;
-using System.IO;
-using System.Windows.Forms;
 using System.Collections.Generic;
-
-#endregion
 
 namespace cAlgo
 {
-    /// <summary>
-    /// Estensioni che rendono il codice più scorrevole con metodi non previsti dalla libreria cAlgo
-    /// </summary>
+
     public static class Extensions
     {
 
         #region Enum
 
-        /// <summary>
-        /// Enumeratore per esporre il nome del colore nelle opzioni
-        /// </summary>
         public enum ColorNameEnum
         {
 
@@ -186,9 +160,6 @@ namespace cAlgo
 
         }
 
-        /// <summary>
-        /// Enumeratore per esporre nei parametri una scelta con menu a tendina
-        /// </summary>
         public enum CapitalTo
         {
 
@@ -220,17 +191,11 @@ namespace cAlgo
 
         #region Class
 
-        /// <summary>
-        /// Classe per monitorare le posizioni di una specifica strategia
-        /// </summary>
         public class Monitor
         {
 
-            private Positions _allPositions = null;
+            private readonly Positions _allPositions = null;
 
-            /// <summary>
-            /// Standard per la raccolta di informazioni nel Monitor
-            /// </summary>
             public class Information
             {
 
@@ -247,9 +212,6 @@ namespace cAlgo
 
             }
 
-            /// <summary>
-            /// Standard per l'interpretazione dell'orario in double
-            /// </summary>
             public class PauseTimes
             {
 
@@ -258,13 +220,9 @@ namespace cAlgo
 
             }
 
-            /// <summary>
-            /// Standard per la gestione del break even
-            /// </summary>
             public class BreakEvenData
             {
 
-                // --> In caso di operazioni multiple sarebbe bene evitare la gestione di tutte
                 public bool OnlyFirst = false;
                 public bool Negative = false;
                 public double Activation = 0;
@@ -273,13 +231,9 @@ namespace cAlgo
 
             }
 
-            /// <summary>
-            /// Standard per la gestione del trailing
-            /// </summary>
             public class TrailingData
             {
 
-                // --> In caso di operazioni multiple sarebbe bene evitare la gestione di tutte
                 public bool OnlyFirst = false;
                 public bool ProActive = false;
                 public double Activation = 0;
@@ -287,49 +241,22 @@ namespace cAlgo
 
             }
 
-            /// <summary>
-            /// Memorizza lo stato di apertura di una operazione nella Bar corrente
-            /// </summary>
             public bool OpenedInThisBar = false;
 
-            /// <summary>
-            /// Memorizza lo stato di apertura di una operazione con il trigger corrente
-            /// </summary>
             public bool OpenedInThisTrigger = false;
 
-            /// <summary>
-            /// Valore univoco che identifica la strategia
-            /// </summary>
             public readonly string Label;
 
-            /// <summary>
-            /// Il Simbolo da monitorare in relazione alla Label
-            /// </summary>
             public readonly Symbol Symbol;
 
-            /// <summary>
-            /// Le Bars con il quale la strategia si muove ed elabora le sue condizioni
-            /// </summary>
             public readonly Bars Bars;
 
-            /// <summary>
-            /// Il riferimento temporale della pausa
-            /// </summary>
             public readonly PauseTimes Pause;
 
-            /// <summary>
-            /// Le informazioni raccolte dopo la chiamata .Update()
-            /// </summary>
             public Information Info { get; private set; }
 
-            /// <summary>
-            /// Le posizioni filtrate in base al simbolo e alla label
-            /// </summary>
             public Position[] Positions { get; private set; }
 
-            /// <summary>
-            /// Monitor per la raccolta d'informazioni inerenti la strategia in corso
-            /// </summary>
             public Monitor(string NewLabel, Symbol NewSymbol, Bars NewBars, Positions AllPositions, PauseTimes NewPause)
             {
 
@@ -342,29 +269,21 @@ namespace cAlgo
 
                 _allPositions = AllPositions;
 
-                // --> Rendiamo sin da subito disponibili le informazioni
                 Update(false, null, null, 0);
 
             }
 
-            /// <summary>
-            /// Filtra e rende disponibili le informazioni per la strategia monitorata. Eventualmente Chiude e gestisce le operazioni
-            /// </summary>
             public Information Update(bool closeall, BreakEvenData breakevendata, TrailingData trailingdata, double SafeLoss, TradeType? filtertype = null)
             {
 
-                // --> Raccolgo le informazioni che mi servono per avere il polso della strategia
                 Positions = _allPositions.FindAll(Label, Symbol.Name);
 
-                // --> Devo trascinarmi i vecchi dati prima di aggiornarli come massimali
                 double highestHighAfterFirstOpen = (Positions.Length > 0) ? Info.HighestHighAfterFirstOpen : 0;
                 double lowestLowAfterFirstOpen = (Positions.Length > 0) ? Info.LowestLowAfterFirstOpen : 0;
 
-                // --> Resetto le informazioni
                 Info = new Information 
                 {
 
-                    // --> Inizializzo con i vecchi dati
                     HighestHighAfterFirstOpen = highestHighAfterFirstOpen,
                     LowestLowAfterFirstOpen = lowestLowAfterFirstOpen
 
@@ -375,13 +294,11 @@ namespace cAlgo
                 foreach (Position position in Positions)
                 {
 
-                    // --> Per il trailing proactive e altre feature devo conoscere lo stato attuale
                     if (Info.HighestHighAfterFirstOpen == 0 || Symbol.Ask > Info.HighestHighAfterFirstOpen)
                         Info.HighestHighAfterFirstOpen = Symbol.Ask;
                     if (Info.LowestLowAfterFirstOpen == 0 || Symbol.Bid < Info.LowestLowAfterFirstOpen)
                         Info.LowestLowAfterFirstOpen = Symbol.Bid;
 
-                    // --> Per prima cosa devo controllare se chiudere la posizione
                     if (closeall && (filtertype == null || position.TradeType == filtertype))
                     {
 
@@ -390,13 +307,11 @@ namespace cAlgo
 
                     }
 
-                    // --> Il broker potrebbe non accettare lo stoploss e quindi non settarlo, intervengo ?
                     if (SafeLoss > 0 && position.StopLoss == null)
                     {
 
                         TradeResult result = position.ModifyStopLossPips(SafeLoss);
 
-                        // --> Troppa voaltilità potrebbe portare a proporzioni e valori errati, comunque non andiamo oltre 
                         if (result.Error == ErrorCode.InvalidRequest || result.Error == ErrorCode.InvalidStopLossTakeProfit)
                         {
 
@@ -408,13 +323,11 @@ namespace cAlgo
 
                     }
 
-                    // --> Poi tocca al break even
                     if ((breakevendata != null && !breakevendata.OnlyFirst) || Positions.Length == 1)
-                        _checkBreakEven(position, breakevendata);
+                        CheckBreakEven(position, breakevendata);
 
-                    // --> Poi tocca al trailing
                     if ((trailingdata != null && !trailingdata.OnlyFirst) || Positions.Length == 1)
-                        _checkTrailing(position, trailingdata);
+                        CheckTrailing(position, trailingdata);
 
                     Info.TotalNetProfit += position.NetProfit;
                     tmpVolume += position.VolumeInUnits;
@@ -447,7 +360,6 @@ namespace cAlgo
 
                 }
 
-                // --> Restituisce una Exception Overflow di una operazione aritmetica, da approfondire
                 //     Info.MidVolumeInUnits = Symbol.NormalizeVolumeInUnits(tmpVolume / Positions.Length,RoundingMode.ToNearest);
                 Info.MidVolumeInUnits = Math.Round(tmpVolume / Positions.Length, 0);
 
@@ -455,9 +367,6 @@ namespace cAlgo
 
             }
 
-            /// <summary>
-            /// Chiude tutte le posizioni del monitor
-            /// </summary>
             public void CloseAllPositions(TradeType? filtertype = null)
             {
 
@@ -465,9 +374,6 @@ namespace cAlgo
 
             }
 
-            /// <summary>
-            /// Stabilisce se si è in GAP passando una certa distanza da misurare
-            /// </summary>
             public bool InGAP(double distance)
             {
 
@@ -475,22 +381,14 @@ namespace cAlgo
 
             }
 
-            /// <summary>
-            /// Controlla la fascia oraria per determinare se rientra in quella di pausa, utilizza dati double 
-            /// perchè la ctrader non permette di esporre dati time, da aggiornare non appena la ctrader lo permette
-            /// </summary>
-            /// <returns>Conferma la presenza di una fascia oraria in pausa</returns>
             public bool InPause(DateTime timeserver)
             {
 
-                // -->> Poichè si utilizzano dati double per esporre i parametri dobbiamo utilizzare meccanismi per tradurre l'orario
                 string nowHour = (timeserver.Hour < 10) ? string.Format("0{0}", timeserver.Hour) : string.Format("{0}", timeserver.Hour);
                 string nowMinute = (timeserver.Minute < 10) ? string.Format("0{0}", timeserver.Minute) : string.Format("{0}", timeserver.Minute);
 
-                // --> Stabilisco il momento di controllo in formato double
                 double adesso = Convert.ToDouble(string.Format("{0},{1}", nowHour, nowMinute));
 
-                // --> Confronto elementare per rendere comprensibile la logica
                 if (Pause.Over < Pause.Under && adesso >= Pause.Over && adesso <= Pause.Under)
                 {
 
@@ -508,10 +406,7 @@ namespace cAlgo
 
             }
 
-            /// <summary>
-            /// Controlla ed effettua la modifica in break-even se le condizioni le permettono
-            /// </summary>
-            private void _checkBreakEven(Position position, BreakEvenData breakevendata)
+            private void CheckBreakEven(Position position, BreakEvenData breakevendata)
             {
 
                 if (breakevendata == null || breakevendata.Activation == 0)
@@ -570,16 +465,13 @@ namespace cAlgo
 
             }
 
-            /// <summary>
-            /// Controlla ed effettua la modifica in trailing se le condizioni le permettono
-            /// </summary>
-            private void _checkTrailing(Position position, TrailingData trailingdata)
+            private void CheckTrailing(Position position, TrailingData trailingdata)
             {
 
                 if (trailingdata == null || trailingdata.Activation == 0 || trailingdata.Distance == 0)
                     return;
 
-                double trailing = 0;
+                double trailing;
                 double distance = Symbol.PipsToDigits(trailingdata.Distance);
                 double activation = Symbol.PipsToDigits(trailingdata.Activation);
 
@@ -599,11 +491,9 @@ namespace cAlgo
                         else if (trailingdata.ProActive && Info.HighestHighAfterFirstOpen > 0 && position.StopLoss != null && position.StopLoss > 0)
                         {
 
-                            // --> Devo determinare se è partita l'attivazione
                             double activationprice = position.EntryPrice + activation;
                             double firsttrailing = Math.Round(activationprice - distance, Symbol.Digits);
 
-                            // --> Partito il trailing? Sono in retrocessione ?
                             if (position.StopLoss >= firsttrailing)
                             {
 
@@ -636,11 +526,9 @@ namespace cAlgo
                         else if (trailingdata.ProActive && Info.LowestLowAfterFirstOpen > 0 && position.StopLoss != null && position.StopLoss > 0)
                         {
 
-                            // --> Devo determinare se è partita l'attivazione
                             double activationprice = position.EntryPrice - activation;
                             double firsttrailing = Math.Round(activationprice + distance, Symbol.Digits);
 
-                            // --> Partito il trailing? Sono in retrocessione ?
                             if (position.StopLoss <= firsttrailing)
                             {
 
@@ -666,9 +554,6 @@ namespace cAlgo
 
         }
 
-        /// <summary>
-        /// Classe per gestire il dimensionamento delle size
-        /// </summary>
         public class MonenyManagement
         {
 
@@ -677,18 +562,11 @@ namespace cAlgo
             private double _fixedSize = 0;
             private double _pipToCalc = 30;
 
-            // --> Riferimenti agli oggetti esterni utili per il calcolo
-            private IAccount _account = null;
+            private readonly IAccount _account = null;
             public readonly Symbol Symbol;
 
-            /// <summary>
-            /// Il capitale da utilizzare per il calcolo
-            /// </summary>
             public CapitalTo CapitalType = CapitalTo.Balance;
 
-            /// <summary>
-            /// La percentuale di rischio che si vuole investire
-            /// </summary>
             public double Percentage
             {
 
@@ -698,9 +576,6 @@ namespace cAlgo
                 set { _percentage = (value > 0 && value <= 100) ? value : 0; }
             }
 
-            /// <summary>
-            /// La size fissa da utilizzare, bypassa tutti i parametri di calcolo
-            /// </summary>
             public double FixedSize
             {
 
@@ -712,9 +587,6 @@ namespace cAlgo
             }
 
 
-            /// <summary>
-            /// La distanza massima dall'ingresso con il quale calcolare le size
-            /// </summary>
             public double PipToCalc
             {
 
@@ -724,9 +596,6 @@ namespace cAlgo
             }
 
 
-            /// <summary>
-            /// Il capitale effettivo sul quale calcolare il rischio
-            /// </summary>
             public double Capital
             {
 
@@ -750,8 +619,6 @@ namespace cAlgo
             }
 
 
-
-            // --> Costruttore
             public MonenyManagement(IAccount NewAccount, CapitalTo NewCapitalTo, double NewPercentage, double NewFixedSize, double NewPipToCalc, Symbol NewSymbol)
             {
 
@@ -766,20 +633,14 @@ namespace cAlgo
 
             }
 
-            /// <summary>
-            /// Restituisce il numero di lotti in formato 0.01
-            /// </summary>
             public double GetLotSize()
             {
 
-                // --> Hodeciso di usare una size fissa
                 if (FixedSize > 0)
                     return FixedSize;
 
-                // --> La percentuale di rischio in denaro
                 double moneyrisk = Capital / 100 * Percentage;
 
-                // --> Traduco lo stoploss o il suo riferimento in double
                 double sl_double = PipToCalc * Symbol.PipSize;
 
                 // --> In formato 0.01 = microlotto double lots = Math.Round(Symbol.VolumeInUnitsToQuantity(moneyrisk / ((sl_double * Symbol.TickValue) / Symbol.TickSize)), 2);
@@ -799,10 +660,7 @@ namespace cAlgo
 
         #region Helper
 
-        /// <summary>
-        /// Restituisce il colore corrispondente a partire dal nome
-        /// </summary>
-        /// <returns>Il colore corrispondente</returns>
+
         public static API.Color ColorFromEnum(ColorNameEnum colorName)
         {
 
@@ -814,11 +672,6 @@ namespace cAlgo
 
         #region Bars
 
-        /// <summary>
-        /// Si ottiene l'indice della candela partendo dal suo orario di apertura
-        /// </summary>
-        /// <param name="MyTime">La data e l'ora di apertura della candela</param>
-        /// <returns></returns>
         public static int GetIndexByDate(this Bars thisBars, DateTime thisTime)
         {
 
@@ -860,10 +713,6 @@ namespace cAlgo
 
         #region Bar
 
-        /// <summary>
-        /// Misura la grandezza di una candela, tenendo conto della sua direzione
-        /// </summary>
-        /// <returns>Il corpo della candela, valore uguale o superiore a zero</returns>
         public static double Body(this Bar thisBar)
         {
 
@@ -872,10 +721,6 @@ namespace cAlgo
 
         }
 
-        /// <summary>
-        /// Verifica la direzione rialzista di una candela
-        /// </summary>
-        /// <returns>True se la candela è rialzista</returns>        
         public static bool IsBullish(this Bar thisBar)
         {
 
@@ -883,10 +728,6 @@ namespace cAlgo
 
         }
 
-        /// <summary>
-        /// Verifica la direzione ribassista di una candela
-        /// </summary>
-        /// <returns>True se la candela è ribassista</returns>        
         public static bool IsBearish(this Bar thisBar)
         {
 
@@ -894,10 +735,6 @@ namespace cAlgo
 
         }
 
-        /// <summary>
-        /// Verifica se una candela ha un open uguale al close
-        /// </summary>
-        /// <returns>True se la candela è una doji con Open e Close uguali</returns>        
         public static bool IsDoji(this Bar thisBar)
         {
 
@@ -909,11 +746,6 @@ namespace cAlgo
 
         #region Symbol
 
-        /// <summary>
-        /// Converte il numero di pips corrente da digits a double
-        /// </summary>
-        /// <param name="Pips">Il numero di pips nel formato Digits</param>
-        /// <returns></returns>
         public static double DigitsToPips(this Symbol thisSymbol, double Pips)
         {
 
@@ -921,11 +753,6 @@ namespace cAlgo
 
         }
 
-        /// <summary>
-        /// Converte il numero di pips corrente da double a digits
-        /// </summary>
-        /// <param name="Pips">Il numero di pips nel formato Double (2)</param>
-        /// <returns></returns>
         public static double PipsToDigits(this Symbol thisSymbol, double Pips)
         {
 
@@ -944,9 +771,6 @@ namespace cAlgo
 
         #region TimeFrame
 
-        /// <summary>
-        /// Restituisce in minuti il timeframe corrente
-        /// </summary>
         public static int ToMinutes(this TimeFrame thisTimeFrame)
         {
 
@@ -1021,38 +845,15 @@ namespace cAlgo.Robots
 
         #region Identity
 
-        public const int ID = 189113;
-
         public const string NAME = "Adrenaline";
 
-        public const string VERSION = "1.1.1";
-
-        #endregion
-
-        #region UPDATE : VARIABILI
-
-        private const string PRODUCTPAGE = "https://ctrader.guru/shop/cbots/scalping-adrenaline/";
-        private const string LICENSEPAGE = "https://ctrader.guru/license/";
-
-        #endregion
-
-        #region LICENZA : VARIABILI
-
-        string productName = NAME;
-        readonly string endpoint = "https://ctrader.guru/_checkpoint_/";
-
-        DateTime licenzaExpire;
-        CL_CTG_Licenza licenza = null;
-        CL_CTG_Licenza.LicenzaInfo licenzaInfo = null;
-        bool exitoncalculate = false;
-        private ControlBase DrawingDialog = null;
-        public Extensions.ColorNameEnum TextColor = Extensions.ColorNameEnum.Coral;
+        public const string VERSION = "1.1.2";
 
         #endregion
 
         #region Params
 
-        [Parameter(NAME + " " + VERSION, Group = "Identity", DefaultValue = PRODUCTPAGE)]
+        [Parameter(NAME + " " + VERSION, Group = "Identity", DefaultValue = "https://www.google.com/search?q=ctrader+guru+adrenaline+scalper")]
         public string ProductInfo { get; set; }
 
         [Parameter("Label ( Magic Name )", Group = "Identity", DefaultValue = NAME)]
@@ -1103,7 +904,7 @@ namespace cAlgo.Robots
         [Parameter("Period", Group = "Force Index", DefaultValue = 7, MinValue = 1)]
         public int FIPeriod { get; set; }
 
-        [Parameter("Trigger value", Group = "Force Index", DefaultValue = 8.4, MinValue = 0.00001)]
+        [Parameter("Trigger value", Group = "Force Index", DefaultValue = 8.4, MinValue = 1E-05)]
         public double FITrigger { get; set; }
 
         #endregion
@@ -1126,29 +927,6 @@ namespace cAlgo.Robots
         protected override void OnStart()
         {
 
-            #region LICENZA : INIT CHECK
-
-            CL_CTG_Licenza.LicenzaConfig licConfig = new CL_CTG_Licenza.LicenzaConfig 
-            {
-                AccountBroker = Account.BrokerName,
-                AcconuntNumber = Account.Number.ToString()
-            };
-
-            licenza = new CL_CTG_Licenza(endpoint, licConfig, productName);
-
-            _checkLicense();
-
-            if (exitoncalculate)
-                return;
-
-            #endregion
-
-            #region UPDATE : INIT CHECK
-
-            _checkProductUpdate();
-
-            #endregion
-
             if (StrategyType == Extensions.StrategyType.Auto)
                 StrategyType = (StopLoss > TakeProfit) ? Extensions.StrategyType.Aggressive : Extensions.StrategyType.Moderate;
 
@@ -1161,8 +939,8 @@ namespace cAlgo.Robots
             };
             Monitor1 = new Extensions.Monitor(MyLabel, Symbol, Bars, Positions, Pause1);
 
-            Positions.Closed += _onPositionsClosed;
-            Positions.Opened += _onPositionsOpened;
+            Positions.Closed += OnPositionsClosed;
+            Positions.Opened += OnPositionsOpened;
 
             EMA200 = Indicators.ExponentialMovingAverage(Bars.ClosePrices, 200);
             EMA500 = Indicators.ExponentialMovingAverage(Bars.ClosePrices, 500);
@@ -1180,60 +958,9 @@ namespace cAlgo.Robots
         protected override void OnTick()
         {
 
-
-            #region LICENZA : LOOP CHECK
-
-            if (RunningMode == RunningMode.RealTime)
-            {
-
-                if (exitoncalculate)
-                {
-
-                    if (DrawingDialog != null && !DrawingDialog.IsVisible)
-                    {
-
-                        Stop();
-
-                    }
-                    else
-                    {
-
-                        _createButtonLogin();
-
-                    }
-
-                    return;
-
-                }
-                else if (licenzaExpire != null && licenzaInfo.Expire.CompareTo("*") != 0 && Monitor1.Positions.Length == 0)
-                {
-
-                    if (DateTime.Compare(licenzaExpire, Server.Time) > 0)
-                    {
-
-                        // --> TODO
-
-                    }
-                    else
-                    {
-
-                        exitoncalculate = true;
-
-                        Print("Expired (" + licenzaExpire + ")" + " (server : " + Server.Time.ToString() + ")");
-
-                        return;
-
-                    }
-
-                }
-
-            }
-
-            #endregion
-
             Monitor1.Update(false, null, null, 0, null);
 
-            if (Monitor1.OpenedInThisBar || Monitor1.Positions.Length > 0 || Monitor1.InPause(Server.Time) || !_canCowork(Monitor1))
+            if (Monitor1.OpenedInThisBar || Monitor1.Positions.Length > 0 || Monitor1.InPause(Server.Time) || !CanCowork(Monitor1))
                 return;
 
             bool sharedFilter = (Monitor1.Symbol.RealSpread() <= SpreadToTrigger && !Monitor1.InGAP(GAP) && !Monitor1.OpenedInThisBar && Monitor1.Positions.Length < 1);
@@ -1249,14 +976,14 @@ namespace cAlgo.Robots
             double RealMultiplier = (BalanceMultiplier > 0) ? (int)(Account.Balance / BalanceMultiplier) : 1;
             double RealLots = (RealMultiplier > 1) ? Lots * RealMultiplier : Lots;
 
-            if (_FITriggerLong() && sharedFilter && filter1long && filter2long && filter3long)
+            if (FITriggerLong() && sharedFilter && filter1long && filter2long && filter3long)
             {
 
                 ExecuteOrder(Symbol.QuantityToVolumeInUnits(RealLots), TradeType.Buy);
                 Monitor1.OpenedInThisBar = true;
 
             }
-            else if (_FITriggerShort() && sharedFilter && filter1short && filter2short && filter3short)
+            else if (FITriggerShort() && sharedFilter && filter1short && filter2short && filter3short)
             {
 
                 ExecuteOrder(Symbol.QuantityToVolumeInUnits(RealLots), TradeType.Sell);
@@ -1290,7 +1017,7 @@ namespace cAlgo.Robots
 
         }
 
-        private void _onPositionsClosed(PositionClosedEventArgs args)
+        private void OnPositionsClosed(PositionClosedEventArgs args)
         {
 
             var position = args.Position;
@@ -1305,8 +1032,6 @@ namespace cAlgo.Robots
 
                 if (MaxLoss == 0 || ConsecutiveLoss < MaxLoss)
                 {
-
-                    //MaxLossBeforeMultiplier
 
                     double RealMultiplier = (MaxLossBeforeMultiplier == 0 || ConsecutiveLoss >= MaxLossBeforeMultiplier) ? Multiplier : 1;
 
@@ -1332,7 +1057,7 @@ namespace cAlgo.Robots
 
         }
 
-        private void _onPositionsOpened(PositionOpenedEventArgs eventArgs)
+        private void OnPositionsOpened(PositionOpenedEventArgs eventArgs)
         {
 
             if (eventArgs.Position.SymbolName == Monitor1.Symbol.Name && eventArgs.Position.Label == Monitor1.Label)
@@ -1345,28 +1070,28 @@ namespace cAlgo.Robots
 
         }
 
-        private bool _FITriggerShort()
+        private bool FITriggerShort()
         {
 
             return FI.Result.LastValue <= (FITrigger * -1);
 
         }
 
-        private bool _FITriggerLong()
+        private bool FITriggerLong()
         {
 
             return FI.Result.LastValue >= FITrigger;
 
         }
 
-        private bool _canCowork(Extensions.Monitor monitor)
+        private bool CanCowork(Extensions.Monitor monitor)
         {
 
-            return (MaxCross == 0 || monitor.Positions.Length > 0) ? true : _getOtherCross().Count < MaxCross;
+            return (MaxCross == 0 || monitor.Positions.Length > 0) || GetOtherCross().Count < MaxCross;
 
         }
 
-        private List<string> _getOtherCross()
+        private List<string> GetOtherCross()
         {
 
             List<string> OtherCross = new List<string>();
@@ -1384,591 +1109,6 @@ namespace cAlgo.Robots
         }
 
         #endregion
-
-        #region LICENZA & UPDATE : PRIVATE METHOD
-
-        // --> Versione modifica, originale in ScalFibo
-        private void _checkProductUpdate()
-        {
-
-            // --> Controllo solo se sono in realtime, evito le chiamate in backtest
-            if (RunningMode != RunningMode.RealTime)
-                return;
-
-            // --> Organizzo i dati per la richiesta degli aggiornamenti
-            Guru.API.RequestProductInfo Request = new Guru.API.RequestProductInfo 
-            {
-
-                MyProduct = new Guru.Product 
-                {
-
-                    ID = ID,
-                    Name = NAME,
-                    Version = VERSION
-
-                },
-                AccountBroker = Account.BrokerName,
-                AccountNumber = Account.Number
-
-            };
-
-            // --> Effettuo la richiesta
-            Guru.API Response = new Guru.API(Request);
-
-            // --> Controllo per prima cosa la presenza di errori di comunicazioni
-            if (Response.ProductInfo.Exception != "")
-            {
-
-                Print("{0} Exception : {1}", NAME, Response.ProductInfo.Exception);
-
-            }
-            // --> Chiedo conferma della presenza di nuovi aggiornamenti
-            else if (Response.HaveNewUpdate())
-            {
-
-                string updatemex = string.Format("{0} : Updates available {1} ( {2} )", NAME, Response.ProductInfo.LastProduct.Version, Response.ProductInfo.LastProduct.Updated);
-
-                // --> Informo l'utente con un messaggio sul grafico e nei log del cbot
-                Chart.DrawStaticText(NAME + "Updates", updatemex, VerticalAlignment.Top, cAlgo.API.HorizontalAlignment.Left, Extensions.ColorFromEnum(TextColor));
-                Print(updatemex);
-
-            }
-
-        }
-
-        private void _checkLicense(bool bypassread = false)
-        {
-
-            if (RunningMode != RunningMode.RealTime)
-                return;
-
-            try
-            {
-
-                // --> Controllo la licenza solo dal file
-                if (!bypassread)
-                    licenzaInfo = licenza.GetLicenzaFromFile();
-
-                // --> Se non ho il login chiedo di generarlo
-                if (!licenzaInfo.Login)
-                {
-
-                    _createButtonLogin();
-                    exitoncalculate = true;
-                    return;
-
-                }
-                else
-                {
-
-                    if (licenzaInfo.Product.CompareTo(productName.ToUpper()) != 0)
-                    {
-
-                        if (MessageBox.Show("Not for this product, remove cookie session?", "Error", MessageBoxButtons.YesNo, MessageBoxIcon.Error) == DialogResult.Yes)
-                            _removeCookieAndLicense(licenza);
-
-                        exitoncalculate = true;
-                        return;
-
-                    }
-                    else
-                    {
-
-                        if ((licenzaInfo.AccountBroker.CompareTo("*") != 0 && licenzaInfo.AccountBroker.CompareTo(Account.BrokerName) != 0) || (licenzaInfo.AccountNumber.CompareTo("*") != 0 && licenzaInfo.AccountNumber.CompareTo(Account.Number.ToString()) != 0))
-                        {
-
-                            if (MessageBox.Show("Not for this account, remove cookie session?", "Error", MessageBoxButtons.YesNo, MessageBoxIcon.Error) == DialogResult.Yes)
-                                _removeCookieAndLicense(licenza);
-
-                            exitoncalculate = true;
-                            return;
-
-                        }
-                        else
-                        {
-
-                            if (licenzaInfo.Expire == null || licenzaInfo.Expire.Length < 1)
-                            {
-
-                                if (MessageBox.Show("Expired, remove cookie session?", "Error", MessageBoxButtons.YesNo, MessageBoxIcon.Error) == DialogResult.Yes)
-                                    _removeCookieAndLicense(licenza);
-
-                                exitoncalculate = true;
-                                return;
-
-
-                            }
-                            else if (licenzaInfo.Expire.CompareTo("*") != 0)
-                            {
-
-                                try
-                                {
-
-                                    String[] substringsExpire = licenzaInfo.Expire.Split(',');
-
-                                    licenzaExpire = new DateTime(Int32.Parse(substringsExpire[0].Trim()), Int32.Parse(substringsExpire[1].Trim()), Int32.Parse(substringsExpire[2].Trim()), Int32.Parse(substringsExpire[3].Trim()), Int32.Parse(substringsExpire[4].Trim()), Int32.Parse(substringsExpire[5].Trim()));
-
-
-                                    if (DateTime.Compare(licenzaExpire, Server.Time) > 0)
-                                    {
-
-                                        Print("Expire : " + licenzaExpire.ToString() + " (server : " + Server.Time.ToString() + ")");
-                                        exitoncalculate = false;
-
-                                    }
-                                    else
-                                    {
-
-                                        if (MessageBox.Show("Expired (" + licenzaExpire + "), remove cookie session?", "Error", MessageBoxButtons.YesNo, MessageBoxIcon.Error) == DialogResult.Yes)
-                                            _removeCookieAndLicense(licenza);
-
-                                        exitoncalculate = true;
-                                        return;
-
-                                    }
-
-                                } catch
-                                {
-
-                                    if (MessageBox.Show("Expired, remove cookie session?", "Error", MessageBoxButtons.YesNo, MessageBoxIcon.Error) == DialogResult.Yes)
-                                        _removeCookieAndLicense(licenza);
-
-                                    exitoncalculate = true;
-                                    return;
-
-                                }
-
-                            }
-                            else
-                            {
-
-                                Print("Lifetime");
-                                exitoncalculate = false;
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            } catch (Exception exp)
-            {
-
-                MessageBox.Show("Encryption issue, contact support@ctrader.guru", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                licenza.RemoveLicense();
-                exitoncalculate = true;
-
-                Print("Debug : " + exp.Message);
-
-                return;
-
-            }
-
-        }
-
-        private void _createButtonLogin()
-        {
-
-            if (RunningMode != RunningMode.RealTime)
-                return;
-
-            if (DrawingDialog != null)
-            {
-
-                DrawingDialog.IsVisible = true;
-                return;
-
-            }
-
-            StackPanel stackPanel = new StackPanel 
-            {
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = API.HorizontalAlignment.Center,
-                Orientation = API.Orientation.Vertical,
-                IsVisible = false,
-                Width = 200,
-                BackgroundColor = Color.Red,
-                Margin = new Thickness(10, 10, 10, 10)
-            };
-
-            Button btnLogin = new Button 
-            {
-                Text = "CTRADER GURU - LOGIN",
-                BackgroundColor = Color.Red,
-                ForegroundColor = Color.White,
-                Top = 10,
-                CornerRadius = 0,
-                HorizontalContentAlignment = API.HorizontalAlignment.Center
-
-            };
-            btnLogin.Click += delegate
-            {
-
-                if (!exitoncalculate)
-                    return;
-
-                DrawingDialog.IsVisible = false;
-                System.Windows.Forms.Application.DoEvents();
-
-                try
-                {
-
-
-                    _createLicense();
-
-                    OnStart();
-                    OnTick();
-
-                    DrawingDialog.IsVisible = false;
-                    System.Windows.Forms.Application.DoEvents();
-
-                } catch
-                {
-                }
-
-
-            };
-
-            stackPanel.AddChild(btnLogin);
-
-            DrawingDialog = stackPanel;
-            Chart.AddControl(DrawingDialog);
-
-            DrawingDialog.IsVisible = true;
-
-        }
-
-        private void _createLicense()
-        {
-
-            if (RunningMode != RunningMode.RealTime)
-                return;
-
-            // --> Chiedo al server con i cookie, ma prima tento il recupero dal file
-            licenzaInfo = licenza.GetLicenzaFromFile();
-
-            if (licenzaInfo.ErrorProc == -2000)
-            {
-
-                MessageBox.Show("Waiting");
-                return;
-            }
-
-            if (!licenzaInfo.Login || licenzaInfo.ErrorProc != 1000)
-                licenzaInfo = licenza.GetLicenzaFromServer();
-
-            // --> Ci sono problemi con i cookie
-            if (licenzaInfo.ErrorProc == 2 || licenzaInfo.ErrorProc == 3 || licenzaInfo.Login == false)
-            {
-                // --> Rimuovo i cookie comunque
-                licenza.RemoveCookie();
-                licenza.RemoveLicense();
-
-
-                // --> Li rigenero chiedendo il login, faccio attenzione ad altri processi
-                Process[] processlist = Process.GetProcesses();
-                bool finded = false;
-
-                foreach (Process process in processlist)
-                {
-
-                    if (!String.IsNullOrEmpty(process.MainWindowTitle) && process.MainWindowTitle.ToUpper().CompareTo("CTRADER GURU - LOGIN") == 0)
-                    {
-
-                        finded = true;
-                        break;
-
-                    }
-
-                }
-
-                if (!finded)
-                {
-
-
-                    frmLogin LoginForm = new frmLogin(Account.BrokerName, Account.Number.ToString());
-                    LoginForm.FormClosed += delegate
-                    {
-
-                        licenzaInfo = licenza.GetLicenzaFromServer();
-                        _checkLicense();
-
-                    };
-
-                    LoginForm.ShowDialog();
-
-                }
-                else
-                {
-
-                    _alertChart("Others are logging in, waiting...");
-                }
-
-                exitoncalculate = true;
-
-            }
-            else
-            {
-
-                _checkLicense(true);
-
-            }
-
-        }
-
-        private void _removeCookieAndLicense(CL_CTG_Licenza licenza)
-        {
-
-            licenza.RemoveCookie();
-            licenza.RemoveLicense();
-
-        }
-
-        private void _alertChart(string mymex, bool withPrint = true)
-        {
-
-            if (RunningMode != RunningMode.RealTime)
-                return;
-
-            string mex = string.Format("{0} : {1}", NAME.ToUpper(), mymex);
-
-            Chart.DrawStaticText("alert", mex, VerticalAlignment.Center, API.HorizontalAlignment.Center, Color.Red);
-            if (withPrint)
-                Print(mex);
-
-        }
-
-        #endregion
-
-    }
-
-}
-
-/// <summary>
-/// NameSpace che racchiude tutte le feature ctrader.guru
-/// </summary>
-namespace Guru
-{
-    /// <summary>
-    /// Classe che definisce lo standard identificativo del prodotto nel marketplace ctrader.guru
-    /// </summary>
-    public class Product
-    {
-
-        public int ID = 0;
-        public string Name = "";
-        public string Version = "";
-        public string Updated = "";
-        public string LastCheck = "";
-
-    }
-
-    /// <summary>
-    /// Offre la possibilità di utilizzare le API messe a disposizione da ctrader.guru per verificare gli aggiornamenti del prodotto.
-    /// Permessi utente "AccessRights = AccessRights.FullAccess" per accedere a internet ed utilizzare JSON
-    /// </summary>
-    public class API
-    {
-        /// <summary>
-        /// Costante da non modificare, corrisponde alla pagina dei servizi API
-        /// </summary>
-        private const string Service = "https://ctrader.guru/api/product_info/";
-
-        private static string MainPath = string.Format("{0}\\cAlgo\\cTraderGuru\\", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
-        private readonly string InfoFile = string.Format("{0}update", MainPath);
-
-        /// <summary>
-        /// Costante da non modificare, utilizzata per filtrare le richieste
-        /// </summary>
-        private const string UserAgent = "cTrader Guru";
-
-        /// <summary>
-        /// Variabile dove verranno inserite le direttive per la richiesta
-        /// </summary>
-        private RequestProductInfo RequestProduct = new RequestProductInfo();
-
-        /// <summary>
-        /// Variabile dove verranno inserite le informazioni identificative dal server dopo l'inizializzazione della classe API
-        /// </summary>
-        public ResponseProductInfo ProductInfo = new ResponseProductInfo();
-
-        /// <summary>
-        /// Classe che formalizza i parametri di richiesta, vengono inviate le informazioni del prodotto e di profilazione a fini statistici
-        /// </summary>
-        public class RequestProductInfo
-        {
-
-            /// <summary>
-            /// Il prodotto corrente per il quale richiediamo le informazioni
-            /// </summary>
-            public Product MyProduct = new Product();
-
-            /// <summary>
-            /// Broker con il quale effettiamo la richiesta
-            /// </summary>
-            public string AccountBroker = "";
-
-            /// <summary>
-            /// Il numero di conto con il quale chiediamo le informazioni
-            /// </summary>
-            public int AccountNumber = 0;
-
-        }
-
-        /// <summary>
-        /// Classe che formalizza lo standard per identificare le informazioni del prodotto
-        /// </summary>
-        public class ResponseProductInfo
-        {
-
-            /// <summary>
-            /// Il prodotto corrente per il quale vengono fornite le informazioni
-            /// </summary>
-            public Product LastProduct = new Product();
-
-            /// <summary>
-            /// Eccezioni in fase di richiesta al server, da utilizzare per controllare l'esito della comunicazione
-            /// </summary>
-            public string Exception = "";
-
-            /// <summary>
-            /// La risposta del server
-            /// </summary>
-            public string Source = "";
-
-        }
-
-        /// <summary>
-        /// Richiede le informazioni del prodotto richiesto
-        /// </summary>
-        /// <param name="Request"></param>
-        public API(RequestProductInfo Request)
-        {
-
-            RequestProduct = Request;
-
-            // --> Non controllo se non ho l'ID del prodotto
-            if (Request.MyProduct.ID <= 0)
-                return;
-
-            string cleanedproduct = string.Join("-", Request.MyProduct.Name.Split(default(string[]), StringSplitOptions.RemoveEmptyEntries));
-            string fileToCheck = InfoFile + "-" + cleanedproduct.ToUpper() + ".json";
-
-            // --> Controllo che siano passati almeno 30minuti tra una richiesta e l'altra
-            try
-            {
-
-                string infodata = File.ReadAllText(fileToCheck);
-
-                Product infolocal = JsonConvert.DeserializeObject<Product>(infodata);
-
-                if (infolocal.LastCheck != "" && infolocal.ID == Request.MyProduct.ID)
-                {
-
-                    DateTime timeToTrigger = DateTime.Parse(infolocal.LastCheck).AddMinutes(60);
-
-                    // --> Controllo se ci sono le condizioni per procedere
-                    if (DateTime.Compare(timeToTrigger, DateTime.Now) > 0)
-                    {
-
-                        ProductInfo.LastProduct = infolocal;
-                        return;
-
-                    }
-
-                }
-
-            } catch
-            {
-
-            }
-
-            // --> Dobbiamo supervisionare la chiamata per registrare l'eccexione
-            try
-            {
-
-                // --> Strutturo le informazioni per la richiesta POST
-                NameValueCollection data = new NameValueCollection 
-                {
-                    {
-                        "account_broker",
-                        Request.AccountBroker
-                    },
-                    {
-                        "account_number",
-                        Request.AccountNumber.ToString()
-                    },
-                    {
-                        "my_version",
-                        Request.MyProduct.Version
-                    },
-                    {
-                        "productid",
-                        Request.MyProduct.ID.ToString()
-                    }
-                };
-
-                // --> Autorizzo tutte le pagine di questo dominio
-                Uri myuri = new Uri(Service);
-                string pattern = string.Format("{0}://{1}/.*", myuri.Scheme, myuri.Host);
-
-                Regex urlRegEx = new Regex(pattern);
-                WebPermission p = new WebPermission(NetworkAccess.Connect, urlRegEx);
-                p.Assert();
-
-                // --> Protocollo di sicurezza https://
-                ServicePointManager.SecurityProtocol = (SecurityProtocolType)192 | (SecurityProtocolType)768 | (SecurityProtocolType)3072;
-
-                // -->> Richiedo le informazioni al server
-                using (var wb = new WebClient())
-                {
-
-                    wb.Headers.Add("User-Agent", UserAgent);
-
-                    var response = wb.UploadValues(myuri, "POST", data);
-                    ProductInfo.Source = Encoding.UTF8.GetString(response);
-
-                }
-
-                // -->>> Nel cBot necessita l'attivazione di "AccessRights = AccessRights.FullAccess"
-                ProductInfo.LastProduct = JsonConvert.DeserializeObject<Product>(ProductInfo.Source);
-                ProductInfo.LastProduct.LastCheck = DateTime.Now.ToString();
-
-                // --> Aggiorno il file locale
-                try
-                {
-
-                    Directory.CreateDirectory(MainPath);
-
-                    File.WriteAllText(fileToCheck, JsonConvert.SerializeObject(ProductInfo.LastProduct));
-
-                } catch
-                {
-                }
-
-            } catch (Exception Exp)
-            {
-
-                // --> Qualcosa è andato storto, registro l'eccezione
-                ProductInfo.Exception = Exp.Message;
-
-            }
-
-        }
-
-        /// <summary>
-        /// Esegue un confronto tra le versioni per determinare la presenza di aggiornamenti
-        /// </summary>
-        /// <returns></returns>
-        public bool HaveNewUpdate()
-        {
-
-            // --> Voglio essere sicuro che stiamo lavorando con le informazioni giuste
-            return (ProductInfo.LastProduct.ID == RequestProduct.MyProduct.ID && ProductInfo.LastProduct.Version != "" && RequestProduct.MyProduct.Version != "" && ProductInfo.LastProduct.Version != null && new Version(RequestProduct.MyProduct.Version).CompareTo(new Version(ProductInfo.LastProduct.Version)) < 0);
-
-        }
 
     }
 
